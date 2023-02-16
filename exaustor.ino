@@ -1,3 +1,4 @@
+#include "Util.h"
 #define P_OUT_BANHEIRO 2
 #define P_OUT_LAVABO 3
 #define P_OUT_EXAUSTOR 4
@@ -5,8 +6,8 @@
 #define P_IN_LAVABO 5
 #define P_IN_BANHEIRO 6
 #define P_IN_QUARTO 7
-
-
+#define TIMER_3 1800000
+#define TEMPO_DELAY 0
 //1 ___________________ 10
 //  * * * * * * * * * * MACHO
 
@@ -27,9 +28,12 @@
 //9 = D2 BANHEIRO
  
 bool lampadaBanheiroLigada =false;
-bool estadoSuiteBanheiro =HIGH;
-bool estadoSuiteQuarto =HIGH;
+bool estadoSuitchBanheiro =HIGH;
+bool estadoSuitchQuarto =HIGH;
+bool desligarLavaboForcado = false;
+Util util;
 void setup() {
+  util.iniciaTimer3(TIMER_3);
   // put your setup code here, to run once:
   pinMode(P_IN_BANHEIRO,INPUT_PULLUP);
   pinMode(P_IN_QUARTO,INPUT_PULLUP);
@@ -47,32 +51,39 @@ void setup() {
 
 void loop() {
 
-      if (lampadaBanheiroLigada || isSuiteLavaboOn()){
+      if (lampadaBanheiroLigada || isSuitchLavaboOn()){
           ligarExaustor();
       }else desligarExaustor();
 
-      if (isAcionouSuiteBanheiro() || isAcionouSuiteQuarto()){
+      if (isAcionouSuitchBanheiro() || isAcionouSuitchQuarto()){
           ligarDesligarBanheiro();
       }
-      if (isSuiteLavaboOn()){
+      if (isSuitchLavaboOn()){
           ligarLavabo();
       }else   desligarLavabo();
   
-    // put your main code here, to run repeatedly:
+
+    if (lampadaBanheiroLigada){
+
+      if (util.saidaTimer3()){
+            ligarDesligarBanheiro();
+      }
+
+    }else util.reIniciaTimer3();
+  
 
 }
 
 void desligarExaustor(){
   
   digitalWrite(P_OUT_EXAUSTOR, LOW);
-  delay(100);
   Serial.println("DESLIGA EXAUSTOR ");
 
 }
 void ligarExaustor(){
 
   digitalWrite(P_OUT_EXAUSTOR, HIGH);
-  delay(100); 
+  delay(TEMPO_DELAY);
   Serial.println("LIGA EXAUSTOR ");
 
 }
@@ -80,44 +91,56 @@ void ligarExaustor(){
 void ligarDesligarBanheiro(){
   lampadaBanheiroLigada = !lampadaBanheiroLigada;
   digitalWrite(P_OUT_BANHEIRO, lampadaBanheiroLigada);
-  delay(100);
+  delay(TEMPO_DELAY);
   Serial.print("LUZ Banheeiro: ");
   Serial.println(lampadaBanheiroLigada);
 }
 void desligarLavabo(){
    digitalWrite(P_OUT_LAVABO, LOW);
-   delay(100);
   Serial.println("DESLIGA LAVABO ");
   
   }
 
 void ligarLavabo(){
    digitalWrite(P_OUT_LAVABO, HIGH);
-   delay(100);
-  Serial.println("LIGA LAVABO");
+   Serial.println("LIGA LAVABO");
 }
 
-bool isAcionouSuiteBanheiro(){
+bool isAcionouSuitchBanheiro(){
   
-  if (estadoSuiteBanheiro != digitalRead(P_IN_BANHEIRO)){
-      estadoSuiteBanheiro = digitalRead(P_IN_BANHEIRO);
+  if (estadoSuitchBanheiro != debounce(P_IN_BANHEIRO)){
+      estadoSuitchBanheiro = debounce(P_IN_BANHEIRO);
       return true;
   }else return false;
  
 }
 
-bool isAcionouSuiteQuarto(){
+bool isAcionouSuitchQuarto(){
   
-  if (estadoSuiteQuarto != digitalRead(P_IN_QUARTO)){
-      estadoSuiteQuarto = digitalRead(P_IN_QUARTO);
+  if (estadoSuitchQuarto != debounce(P_IN_QUARTO)){
+      estadoSuitchQuarto = debounce(P_IN_QUARTO);
       return true;
   }else return false;
  
 }
 
 
-bool isSuiteLavaboOn(){
+bool isSuitchLavaboOn(){
 
- return !digitalRead(P_IN_LAVABO);
+ return debounce(P_IN_LAVABO);
  
+
 }
+boolean debounce(int pin)
+  {
+    boolean current = !digitalRead(pin);      // le o estado atual do botao
+    
+    if(!current)
+    {
+      delay(3);     // espera 3ms --> AQUI VAI O "SEGREDO" DO "EFETIVO E SEGURO, ALÉM DE RÁPIDO DEBOUNCING"
+      current = !digitalRead(pin);      // le NOVAMENTE o estado do botao apos o "debounce"  
+    }
+    return current;     // retorna o valor atualizado do botao (button)
+  }
+ 
+ 
