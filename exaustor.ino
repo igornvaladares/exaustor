@@ -6,8 +6,13 @@
 #define P_IN_LAVABO 5
 #define P_IN_BANHEIRO 6
 #define P_IN_QUARTO 7
-#define TIMER_3 1800000
-#define TEMPO_DELAY 0
+#define TIMER_3 8640000 //24h
+#define PERIODO_LIGADO 1800000 //30 min
+
+//#define TIMER_3 10000 //24h
+//#define PERIODO_LIGADO 5000 //30 min
+
+#define TEMPO_DELAY 100
 //1 ___________________ 10
 //  * * * * * * * * * * MACHO
 
@@ -27,99 +32,117 @@
 //8 = D3 LAVABO;
 //9 = D2 BANHEIRO
  
-bool lampadaBanheiroLigada =false;
+bool lampadaBanheiroLigada =true;
 bool estadoSuitchBanheiro =HIGH;
 bool estadoSuitchQuarto =HIGH;
-bool desligarLavaboForcado = false;
 Util util;
 void setup() {
   util.iniciaTimer3(TIMER_3);
-  // put your setup code here, to run once:
+  util.iniciaTimer4(PERIODO_LIGADO);
+
   pinMode(P_IN_BANHEIRO,INPUT_PULLUP);
   pinMode(P_IN_QUARTO,INPUT_PULLUP);
   pinMode(P_IN_LAVABO,INPUT_PULLUP);
-  Serial.begin(2000000);
 
  pinMode(P_OUT_BANHEIRO,OUTPUT);
  pinMode(P_OUT_EXAUSTOR,OUTPUT);
  pinMode(P_OUT_LAVABO,OUTPUT);
   
- digitalWrite(P_OUT_BANHEIRO, LOW);
- digitalWrite(P_OUT_EXAUSTOR, LOW);
- digitalWrite(P_OUT_LAVABO, LOW);
+ //digitalWrite(P_OUT_BANHEIRO, HIGH);
+ //digitalWrite(P_OUT_EXAUSTOR, HIGH);
+ //digitalWrite(P_OUT_LAVABO, LOW);
 }
+//void(* resetFunc) (void) = 0; //declare reset function @ address 0
 
 void loop() {
-
-      if (lampadaBanheiroLigada || isSuitchLavaboOn()){
-          ligarExaustor();
-      }else desligarExaustor();
 
       if (isAcionouSuitchBanheiro() || isAcionouSuitchQuarto()){
           ligarDesligarBanheiro();
       }
+
       if (isSuitchLavaboOn()){
           ligarLavabo();
       }else   desligarLavabo();
   
 
-    if (lampadaBanheiroLigada){
+      if (lampadaBanheiroLigada || isSuitchLavaboOn()){
+          ligarExaustor();
+      }else desligarExaustor();
 
-      if (util.saidaTimer3()){
-            ligarDesligarBanheiro();
-      }
+    
 
-    }else util.reIniciaTimer3();
+    if (util.saidaTimer3()) {
+          
+          if (!lampadaBanheiroLigada){
   
+              ligarDesligarBanheiro();
+          }
+    }
+
+    if (util.saidaTimer4()) {
+
+          if (lampadaBanheiroLigada){
+  
+              ligarDesligarBanheiro();
+          }
+    }
+
 
 }
 
 void desligarExaustor(){
-  
-  digitalWrite(P_OUT_EXAUSTOR, LOW);
-  Serial.println("DESLIGA EXAUSTOR ");
+  digitalWrite(P_OUT_EXAUSTOR, HIGH);
+  //resetFunc();
 
 }
 void ligarExaustor(){
-
-  digitalWrite(P_OUT_EXAUSTOR, HIGH);
-  delay(TEMPO_DELAY);
-  Serial.println("LIGA EXAUSTOR ");
-
-}
+  
+  digitalWrite(P_OUT_EXAUSTOR, LOW);
+ 
+}  
 
 void ligarDesligarBanheiro(){
-  lampadaBanheiroLigada = !lampadaBanheiroLigada;
-  digitalWrite(P_OUT_BANHEIRO, lampadaBanheiroLigada);
-  delay(TEMPO_DELAY);
-  Serial.print("LUZ Banheeiro: ");
-  Serial.println(lampadaBanheiroLigada);
+
+    util.reIniciaTimer3();
+    util.reIniciaTimer4();
+
+   digitalWrite(P_OUT_BANHEIRO, lampadaBanheiroLigada);
+   lampadaBanheiroLigada = !lampadaBanheiroLigada;
+         
 }
 void desligarLavabo(){
-   digitalWrite(P_OUT_LAVABO, LOW);
-  Serial.println("DESLIGA LAVABO ");
+  
+   digitalWrite(P_OUT_LAVABO, HIGH);
+
   
   }
 
 void ligarLavabo(){
-   digitalWrite(P_OUT_LAVABO, HIGH);
-   Serial.println("LIGA LAVABO");
+
+   digitalWrite(P_OUT_LAVABO, LOW);
+
 }
 
 bool isAcionouSuitchBanheiro(){
   
-  if (estadoSuitchBanheiro != debounce(P_IN_BANHEIRO)){
-      estadoSuitchBanheiro = debounce(P_IN_BANHEIRO);
-      return true;
-  }else return false;
+      if (estadoSuitchBanheiro != util.debounce(P_IN_BANHEIRO)){
+          util.bloquear(TEMPO_DELAY);
+          if (estadoSuitchBanheiro != util.debounce(P_IN_BANHEIRO)){
+              estadoSuitchBanheiro = util.debounce(P_IN_BANHEIRO);
+              return true;
+          }
+      }else return false;
  
 }
 
 bool isAcionouSuitchQuarto(){
   
-  if (estadoSuitchQuarto != debounce(P_IN_QUARTO)){
-      estadoSuitchQuarto = debounce(P_IN_QUARTO);
-      return true;
+  if (estadoSuitchQuarto != util.debounce(P_IN_QUARTO)){
+      util.bloquear(TEMPO_DELAY);
+      if (estadoSuitchQuarto != util.debounce(P_IN_QUARTO)){
+         estadoSuitchQuarto = util.debounce(P_IN_QUARTO);
+         return true;
+      }         
   }else return false;
  
 }
@@ -127,20 +150,13 @@ bool isAcionouSuitchQuarto(){
 
 bool isSuitchLavaboOn(){
 
- return debounce(P_IN_LAVABO);
+        if (util.debounce(P_IN_LAVABO)){
+             util.bloquear(TEMPO_DELAY);
+             return util.debounce(P_IN_LAVABO);
+             }
+         return false;
  
 
 }
-boolean debounce(int pin)
-  {
-    boolean current = !digitalRead(pin);      // le o estado atual do botao
-    
-    if(!current)
-    {
-      delay(3);     // espera 3ms --> AQUI VAI O "SEGREDO" DO "EFETIVO E SEGURO, ALÉM DE RÁPIDO DEBOUNCING"
-      current = !digitalRead(pin);      // le NOVAMENTE o estado do botao apos o "debounce"  
-    }
-    return current;     // retorna o valor atualizado do botao (button)
-  }
- 
+
  
